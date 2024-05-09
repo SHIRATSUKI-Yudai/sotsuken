@@ -1,6 +1,6 @@
 dname=ARG1
 n=ARGV[2]
-l=ARGV[3]
+end=ARGV[3]
 dt=ARGV[4]
 
 set term png
@@ -10,7 +10,7 @@ set xrange [-1.5:1.5]
 set yrange [-1.5:1.5]
 unset key
 
-while (n<=l){
+while (n<=end){
 	pngname = sprintf("../png/%s/%d.png",dname,n)
 	fname = sprintf("%s/snap%05d.dat",dname,n)
 	o = "u 3:4 pt 0"

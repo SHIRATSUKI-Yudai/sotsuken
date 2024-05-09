@@ -376,6 +376,7 @@ public:
 	bool flag_para;  // from program
 	bool flag_bin;   // from program
 
+	public:
 	class HeaderParam{
 	    PS::F64 time;
 	    PS::S64 n_loc;

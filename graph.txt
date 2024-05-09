@@ -1,4 +1,4 @@
-set term x11
-set size square
+set term qt size 1280,1280
 set xrange [-1.5:1.5]
 set yrange [-1.5:1.5]
+plot ARG1 u 3:4 pt 0 

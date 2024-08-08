@@ -796,7 +796,7 @@ int main(int argc, char *argv[]) {
         auto n_walk = tree.getNumberOfWalkGlobal();
         auto n_int_ep_ep = tree.getNumberOfInteractionEPEPGlobal();
         auto n_int_ep_sp = tree.getNumberOfInteractionEPSPGlobal();
-        if(PS::Comm::getRank()==0){
+        if(PS::Comm::getRank()==0 && n_loop % 100 == 0){
             eng_init.dump(std::cout);
             eng_now.dump(std::cout);
             std::cout<<"eng_now.disp= "<<eng_now.disp<<std::endl;

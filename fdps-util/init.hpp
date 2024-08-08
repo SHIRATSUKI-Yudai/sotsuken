@@ -95,6 +95,15 @@ double CM2AU(const double x){
     return x / 1.49597871e13;
 }
 
+double REARTH2CM(const double x){
+    return x * 6.37e8;
+}
+
+double CM2REARTH(const double x){
+    return x / 6.37e8;
+}
+
+
 // [M] = 1 [g]
 // [L] = 1 [cm]
 // [T] = 3.871e3[sec]
@@ -104,6 +113,7 @@ double CM2AU(const double x){
 // G = 1 [L]^3/([M][T]^2)
 // [L] = 1[AU] = 1.495978707e8[km]
 // [M] = 1[Msun] = 1.989e30[kg]
+// [M] = 1[Msun] = 5.97e27[g]
 // [T] = 5.02198050479e6 [sec] = 0.15924595715 [yr]
 // [V] = 29.7886203575 [km/sec]
 void MakeKeplerDisk(PS::F64 & mass_planet_glb,
@@ -112,30 +122,39 @@ void MakeKeplerDisk(PS::F64 & mass_planet_glb,
                     PS::F64vec *& vel,
                     const long long int n_glb,
                     const long long int n_loc,
-                    const double a_in, // [AU]
-                    const double a_out, // [AU]
+                    const double a_in, // [AU]->[r_earth]
+                    const double a_out, // [AU]->[r_earth]
                     const double e_rms, // normalized
                     const double i_rms, // normalized
                     const double dens = 10.0, // [g/cm^2]
-                    const double mass_sun = 1.0, //[m_sun]
+                    const double mass_sun = 1.0, //[m_sun]->[M_earth]
 		    const double a_ice = 0.0,
 		    const double f_ice = 1.0,
 		    const double power = -1.5,
 		    const int seed = 0
     ){
-    static const double mass_sun_gram = 1.989e33; //[g]
+// [M] = 1[Msun] = 1.989e30[kg]
+    //static const double mass_sun_gram = 1.989e33; //[g]
+    static const double mass_earth_gram = 5.97e27; //[g]
     PS::MTTS mt;
     //mt.init_genrand( PS::Comm::getRank() );
     mt.init_genrand( PS::Comm::getRank()+seed*PS::Comm::getNumberOfProc() );
     static const double PI = atan(1.0) * 4.0;
-    const double AU = AU2CM(1.0);
-    //mass_planet_glb = 4.0 * PI * dens * ( sqrt(a_out) - sqrt(a_in) ) * AU * AU / mass_sun_gram; // [Msun]
-    mass_planet_glb = 2.0 * PI * dens / (2.0+power) * ( pow(a_out, 2.0+power) - pow(a_in, 2.0+power) ) * AU * AU / mass_sun_gram; // [Msun]
+    //const double AU = AU2CM(1.0);
+    const double REARTH = REARTH2CM(1.0);
+    // mass_planet_glb = 4 * 0.0123; //[Msun]
+    //   mass_planet_glb = 4.0 * PI * dens * ( sqrt(a_out) - sqrt(a_in) ) * AU * AU / mass_sun_gram; // [Msun]
+    //mass_planet_glb = 2.0 * PI * dens / (2.0+power) * ( pow(a_out, 2.0+power) - pow(a_in, 2.0+power) ) * AU * AU / mass_sun_gram; // [Msun]
+    mass_planet_glb = 2.0 * PI * dens / (2.0+power) * ( pow(a_out, 2.0+power) - pow(a_in, 2.0+power) ) * REARTH * REARTH / mass_earth_gram; // [Mearth]
+    std::cerr << "mass_planet_glb=" << mass_planet_glb << std::endl;
+    //double sigma0 = mass_planet_glb / (2.0 * PI / (2.0 + power) * (pow(a_out, 2.0 + power) - pow(a_in, 2.0 + power)));
+    //std::cerr << "sigma0=" << sigma0 << std::endl;
     const double m_planet = mass_planet_glb / n_glb;
     mass = new double[n_loc];
     pos = new PS::F64vec[n_loc];
     vel = new PS::F64vec[n_loc];
     const double h = pow(2.0*m_planet / (3.0*mass_sun), 1.0/3.0);
+    //std::cerr << "h=" << h << std::endl;
     PS::F64 e_ave = 0.0;
     const PS::F64 e_sigma = sqrt(0.5*e_rms*e_rms); // this is right procedure
     const PS::F64 i_sigma = sqrt(0.5*i_rms*i_rms);
@@ -164,20 +183,20 @@ void MakeKeplerDisk(PS::F64 & mass_planet_glb,
     }
 }
 
-template<class Tpsys>
-void SetParticleKeplerDisk(Tpsys & psys,
+template <class Tpsys>
+void SetParticleKeplerDisk(Tpsys &psys,
                            const PS::S64 n_glb,
-                           const PS::F64 ax_in, // [AU]
-                           const PS::F64 ax_out, // [AU]
-                           const PS::F64 ecc_rms, // normalized
-                           const PS::F64 inc_rms, // normalized
-                           const PS::F64 dens = 10.0, // [g/cm^2]
+                           const PS::F64 ax_in,          // [AU]
+                           const PS::F64 ax_out,         // [AU]
+                           const PS::F64 ecc_rms,        // normalized
+                           const PS::F64 inc_rms,        // normalized
+                           const PS::F64 dens = 10.0,    // [g/cm^2]
                            const PS::F64 mass_sun = 1.0, //[m_sun]
-			   const double a_ice = 0.0,
-			   const double f_ice = 1.0,
-			   const double power = -1.5,
-			   const PS::S32 seed = 0
-    ){
+                           const double a_ice = 0.0,
+                           const double f_ice = 1.0,
+                           const double power = -1.5,
+                           const PS::S32 seed = 0)
+{
     PS::S32 my_rank = PS::Comm::getRank();
     PS::S32 n_proc = PS::Comm::getNumberOfProc();
     auto n_loc = n_glb;

@@ -76,8 +76,9 @@ public:
         n_glb_ = n_glb;
         ax_in_ = ax_in;
         ax_out_ = ax_out;
-        r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
-        //r_phy_ = pow(m_ptcl / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0);
+        //r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
+        //r_phy_ = CM2REARTH(pow(m_ptcl * 5.97e27 / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0));
+	r_phy_ = pow(m_ptcl, 1.0 / 3.0 ) / 2.456 * 2.9;
         r_hill_ = r_phy_ / rphy_over_rhill;
         m_ptcl_ = m_ptcl;
         // m_ptcl_ = (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * 3.0 * PLANET.mass * 0.5;
@@ -225,13 +226,13 @@ int main(int argc, char *argv[])
 
     PS::ParticleSystem<FP_t> system;
     system.initialize();
-    PS::S64 n_glb = 1.0e5;  // 粒子数
-    PS::F64 ax_in = 1;    // 太陽とリングの内側までの距離[AU]
-    PS::F64 ax_out = 2.9;     // 太陽とリングの外側までの距離[AU]
+    PS::S64 n_glb = 1.0e4;  // 粒子数
+    PS::F64 ax_in = 1;    // 地球とリングの内側までの距離[REARTH]
+    PS::F64 ax_out = 3.5;     // 地球とリングの外側までの距離[REARTH]
     PS::F64 ecc_rms = 0.3;  // normalized
     PS::F64 inc_rms = 0.15; // normalized
     PS::F64 dens = 1.0e8;   // [g/cm^2]
-    PS::F64 mass_sun = 1.0; //[m_sun]
+    PS::F64 mass_sun = 1.0; //[MEARTH]
     double a_ice = 0.0;
     double f_ice = 1.0;
     double power = -3.0;
@@ -306,6 +307,8 @@ int main(int argc, char *argv[])
         //std::cout << "a_r=" << 2.456 * pow(pow(system[0].r_coll, 3.0) / system[0].mass, 1.0 / 3.0) << std::endl;
         //std::cout << "R_Roche=" << 2.9 * pow(4.0 / 3.0 * MY_PI * 5.5, -1.0 / 3.0) << std::endl;
         //std::cout << "p=" << system[0].mass / (4.0 / 3.0 * MY_PI * pow(system[0].r_coll, 3.0)) << std::endl;
+	std::cout << "particles density = " << m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll),3)) << std::endl;
+	std::cout << "earth density = " << 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0),3.0)) << std::endl;
 
         for (int i = 0; i < n_glb; i++){
             system[i].writeAscii(fp);

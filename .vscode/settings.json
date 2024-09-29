@@ -69,5 +69,6 @@
         "unordered_map": "cpp",
         "xhash": "cpp",
         "xtree": "cpp"
-    }
+    },
+    "makefile.configureOnOpen": false
 }

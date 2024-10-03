@@ -78,7 +78,7 @@ public:
         ax_out_ = ax_out;
         //r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
         //r_phy_ = CM2REARTH(pow(m_ptcl * 5.97e27 / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0));
-	r_phy_ = pow(m_ptcl, 1.0 / 3.0 ) / 2.456 * 2.9;
+	    r_phy_ = pow(m_ptcl, 1.0 / 3.0 ) / 2.456 * 2.9;
         r_hill_ = r_phy_ / rphy_over_rhill;
         m_ptcl_ = m_ptcl;
         // m_ptcl_ = (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * 3.0 * PLANET.mass * 0.5;
@@ -226,7 +226,7 @@ int main(int argc, char *argv[])
 
     PS::ParticleSystem<FP_t> system;
     system.initialize();
-    PS::S64 n_glb = 1.0e4;  // 粒子数
+    PS::S64 n_glb = 1.0e5;  // 粒子数
     PS::F64 ax_in = 1;    // 地球とリングの内側までの距離[REARTH]
     PS::F64 ax_out = 3.5;     // 地球とリングの外側までの距離[REARTH]
     PS::F64 ecc_rms = 0.3;  // normalized
@@ -282,7 +282,6 @@ int main(int argc, char *argv[])
         cmd.appendNoDefault("log_file", "logfile name", false);
         cmd.read();
 
-        // PS::F64 delta_ax = cmd.get("delta_ax");
         PS::F64 delta_ax = ax_out - ax_in;
         PS::F64 e_refl = 0.1;
         PS::F64 t_dur = cmd.get("t_dur");
@@ -304,17 +303,18 @@ int main(int argc, char *argv[])
 
         disk_info.set_r_coll_search(system, n_glb);
 
-        //std::cout << "a_r=" << 2.456 * pow(pow(system[0].r_coll, 3.0) / system[0].mass, 1.0 / 3.0) << std::endl;
-        //std::cout << "R_Roche=" << 2.9 * pow(4.0 / 3.0 * MY_PI * 5.5, -1.0 / 3.0) << std::endl;
-        //std::cout << "p=" << system[0].mass / (4.0 / 3.0 * MY_PI * pow(system[0].r_coll, 3.0)) << std::endl;
-	std::cout << "particles density = " << m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll),3)) << std::endl;
-	std::cout << "earth density = " << 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0),3.0)) << std::endl;
-
         for (int i = 0; i < n_glb; i++){
             system[i].writeAscii(fp);
         }
 
         fclose(fp);
+
+        PS::F64 dens_p = m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll), 3));
+        PS::F64 dens_e = 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0), 3.0));
+
+        std::cout << "R_Roche=" << 2.456 * pow(dens_p / dens_e, -1.0 / 3.0) << std::endl;
+        std::cout << "particles density = " << dens_p << std::endl;
+        std::cout << "earth density = " << dens_e << std::endl;
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

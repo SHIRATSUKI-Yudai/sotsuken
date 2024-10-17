@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
     PS::ParticleSystem<FP_t> system;
     system.initialize();
     PS::S64 n_glb = 1.0e5;  // 粒子数
-    PS::F64 ax_in = 1;    // 地球とリングの内側までの距離[REARTH]
+    PS::F64 ax_in = 1.0;    // 地球とリングの内側までの距離[REARTH]
     PS::F64 ax_out = 3.5;     // 地球とリングの外側までの距離[REARTH]
     PS::F64 ecc_rms = 0.3;  // normalized
     PS::F64 inc_rms = 0.15; // normalized
@@ -309,12 +309,12 @@ int main(int argc, char *argv[])
 
         fclose(fp);
 
-        PS::F64 dens_p = m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll), 3));
+        PS::F64 dens_p = m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll), 3.0));
         PS::F64 dens_e = 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0), 3.0));
 
-        std::cout << "R_Roche=" << 2.456 * pow(dens_p / dens_e, -1.0 / 3.0) << std::endl;
-        std::cout << "particles density = " << dens_p << std::endl;
-        std::cout << "earth density = " << dens_e << std::endl;
+        std::cout << "R_Roche = " << 2.456 * pow(dens_p / dens_e, -1.0 / 3.0) << " [R_earth]" << std::endl;
+        std::cout << "particles density = " << dens_p << " [g/cm^3]" << std::endl;
+        std::cout << "earth density = " << dens_e << " [g/cm^3]" << std::endl;
 
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

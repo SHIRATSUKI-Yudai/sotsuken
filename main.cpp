@@ -222,7 +222,18 @@ void Drift(Tpsys & psys,
     }
 }
 
-
+template<typename Tpsys>
+void RemoveParticlFromSys(Tpsys & psys){
+    PS::S32 n = psys.getNumberOfParticleLocal();
+    std::vector<PS::S32> id_remove;
+    for(int i=0;i<n;i++){
+        if(psys[i].pos_cyl.y<1.0) id_remove.push_back(i);
+    }
+    if(id_remove.size() > 0){
+        psys.removeParticle(&id_remove[0], id_remove.size());
+        //std::cerr<<"rank= "<<PS::Comm::getRank()<<" id_remove.size()= "<<id_remove.size()<<std::endl;
+    }
+}
 
 template<typename Tpsys>
 void SetID(Tpsys & psys, const PS::S32 start_id=0){
@@ -717,9 +728,10 @@ int main(int argc, char *argv[]) {
 	
         Kick(system, 0.5*param.getDt());
         Drift(system, param.getDt());
-	RemoveSatFromSys(system, sat_system_glb);
+	    RemoveSatFromSys(system, sat_system_glb);
+        RemoveParticlFromSys(system);
 
-	param.integrateTime();
+	    param.integrateTime();
         n_loop++;
         if(n_loop % n_step_share == 0){
 	    DEBUG_PRINT_RING();
@@ -771,7 +783,7 @@ int main(int argc, char *argv[]) {
 
         PS::MemoryPool::checkEmpty();
         sat_system_glb.CalcForce(system);
-	AddSatToSys(system, sat_system_glb);	
+	    AddSatToSys(system, sat_system_glb);	
         CalcForceFromPlanet(system, PLANET);
 	
         Kick(system, 0.5*param.getDt());

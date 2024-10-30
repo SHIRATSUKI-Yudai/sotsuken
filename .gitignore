@@ -1,6 +1,5 @@
 png/
 result/
 gif/
-a.out
-nohup.out
+*.out
 simu.sh

@@ -223,16 +223,27 @@ void Drift(Tpsys & psys,
 }
 
 template<typename Tpsys>
-void RemoveParticlFromSys(Tpsys & psys){
+void RemoveParticlFromSys(Tpsys & psys,Energy & eng_remove){
     PS::S32 n = psys.getNumberOfParticleLocal();
     std::vector<PS::S32> id_remove;
-    for(int i=0;i<n;i++){
-        if(psys[i].pos_cyl.y<1.0) id_remove.push_back(i);
+    PS::F64 pot = 0.0;
+    PS::F64 kin = 0.0;
+    PS::F64 pot_loc = 0.0;
+    PS::F64 kin_loc = 0.0;
+    for(auto i=0;i<n;i++){
+        if(psys[i].pos_cyl.y<1.0) {
+            id_remove.push_back(i);
+            kin_loc += 0.5*psys[i].mass*psys[i].vel*psys[i].vel;
+            pot_loc += psys[i].mass*psys[i].pot;
+        }
     }
     if(id_remove.size() > 0){
         psys.removeParticle(&id_remove[0], id_remove.size());
         //std::cerr<<"rank= "<<PS::Comm::getRank()<<" id_remove.size()= "<<id_remove.size()<<std::endl;
     }
+    pot = PS::Comm::getSum(pot_loc);
+    kin = PS::Comm::getSum(kin_loc);
+    eng_remove.tot += kin + pot;
 }
 
 template<typename Tpsys>
@@ -534,6 +545,7 @@ int main(int argc, char *argv[]) {
 
     FDPS_UTIL::SnapshotManager snapshot_manager(write_file_name_base, dt_snp, flag_para_out, flag_bin_out); // single ascii
     Energy eng_init;
+    Energy eng_remove;
     PS::F64 eng_disp_glb = 0;
     if(flag_start_file){
 	PS::F64 t;
@@ -729,7 +741,7 @@ int main(int argc, char *argv[]) {
         Kick(system, 0.5*param.getDt());
         Drift(system, param.getDt());
 	    RemoveSatFromSys(system, sat_system_glb);
-        RemoveParticlFromSys(system);
+        RemoveParticlFromSys(system,eng_remove);
 
 	    param.integrateTime();
         n_loop++;
@@ -812,8 +824,9 @@ int main(int argc, char *argv[]) {
             eng_init.dump(std::cout);
             eng_now.dump(std::cout);
             std::cout<<"eng_now.disp= "<<eng_now.disp<<std::endl;
+            std::cout<<"eng_remove.tot="<<eng_remove.tot<<std::endl;
             std::cout<<"param.getTimeSys()= "<<param.getTimeSys()<<" n_loop= "<<n_loop<<" (eng_now.tot-eng_init.tot)/eng_init.tot= "<<(eng_now.tot-eng_init.tot)/eng_init.tot
-                     <<" (eng_now.tot-eng_init.tot-eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot-eng_now.disp)/eng_init.tot
+                     <<" (eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot= "<<(eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot
 		//<<" (eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot
                      <<std::endl;
             std::cout<<"n_int_ep_ep= "<<n_int_ep_ep
@@ -827,8 +840,9 @@ int main(int argc, char *argv[]) {
             eng_init.dump(fout_log);
             eng_now.dump(fout_log);
             fout_log<<"eng_now.disp= "<<eng_now.disp<<std::endl;
+            fout_log<<"eng_remove.tot="<<eng_remove.tot<<std::endl;
             fout_log<<"param.getTimeSys()= "<<param.getTimeSys()<<" n_loop= "<<n_loop<<" (eng_now.tot-eng_init.tot)/eng_init.tot= "<<(eng_now.tot-eng_init.tot)/eng_init.tot
-		    <<" (eng_now.tot-eng_init.tot-eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot-eng_now.disp)/eng_init.tot
+		    <<" (eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot= "<<(eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot
 		//<<" (eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot
 		    <<std::endl;
             fout_log<<"n_int_ep_ep= "<<n_int_ep_ep

@@ -65,7 +65,7 @@ class DiskInfo
     }
 
 public:
-    void setParams(const PS::F64 delta_ax, const PS::F64 e_refl, const PS::F64 t_dur, const PS::F64 tau, const PS::F64 rphy_over_rhill, const PS::S64 n_glb, const PS::F64 ax_in, const PS::F64 ax_out, const PS::F64 dens,const PS::F64 m_ptcl)
+    void setParams(const PS::F64 delta_ax, const PS::F64 e_refl, const PS::F64 t_dur, const PS::F64 tau, const PS::F64 rphy_over_rhill, const PS::S64 n_glb, const PS::F64 ax_in, const PS::F64 ax_out, const PS::F64 dens, const PS::F64 m_ptcl)
     {
 
         ax_ = (ax_in + ax_out) / 2.0;
@@ -76,9 +76,9 @@ public:
         n_glb_ = n_glb;
         ax_in_ = ax_in;
         ax_out_ = ax_out;
-        //r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
-        //r_phy_ = CM2REARTH(pow(m_ptcl * 5.97e27 / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0));
-	    r_phy_ = pow(m_ptcl, 1.0 / 3.0 ) / 2.456 * 2.9;
+        // r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
+        // r_phy_ = CM2REARTH(pow(m_ptcl * 5.97e27 / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0));
+        r_phy_ = pow(m_ptcl, 1.0 / 3.0) / 2.456 * 2.9; //[R_EARTH]
         r_hill_ = r_phy_ / rphy_over_rhill;
         m_ptcl_ = m_ptcl;
         // m_ptcl_ = (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * 3.0 * PLANET.mass * 0.5;
@@ -88,9 +88,9 @@ public:
         calcEta();
     }
     DiskInfo() {}
-    DiskInfo(const PS::F64 delta_ax, const PS::F64 e_refl, const PS::F64 t_dur, const PS::F64 tau, const PS::F64 rphy_over_rhill, const PS::S64 n_glb, const PS::F64 ax_in, const PS::F64 ax_out, const PS::F64 dens,const PS::F64 mass_planet_glb)
+    DiskInfo(const PS::F64 delta_ax, const PS::F64 e_refl, const PS::F64 t_dur, const PS::F64 tau, const PS::F64 rphy_over_rhill, const PS::S64 n_glb, const PS::F64 ax_in, const PS::F64 ax_out, const PS::F64 dens, const PS::F64 mass_planet_glb)
     {
-        setParams(delta_ax, e_refl, t_dur, tau, rphy_over_rhill, n_glb, ax_in, ax_out,dens,mass_planet_glb);
+        setParams(delta_ax, e_refl, t_dur, tau, rphy_over_rhill, n_glb, ax_in, ax_out, dens, mass_planet_glb);
     }
     void writeAscii(FILE *fp)
     {
@@ -120,7 +120,8 @@ public:
 
 public:
     template <class Tpsys>
-    void set_r_coll_search(Tpsys &psys,PS::S64 n){
+    void set_r_coll_search(Tpsys &psys, PS::S64 n)
+    {
         for (PS::S64 i = 0; i < n; i++)
         {
             psys[i].r_coll = r_phy_;
@@ -131,8 +132,8 @@ public:
     template <class Tpsys>
     PS::S64 setParticles(Tpsys &psys, const PS::F64ort box, const bool layer = true, const bool random_shift = true)
     {
-        //const auto ax_in = ax_ - 0.5 * delta_ax_;
-        //const auto ax_out = ax_ + 0.5 * delta_ax_;
+        // const auto ax_in = ax_ - 0.5 * delta_ax_;
+        // const auto ax_out = ax_ + 0.5 * delta_ax_;
         const auto area = MY_PI * (ax_out_ * ax_out_ - ax_in_ * ax_in_);
         PS::F64 dS = area / n_glb_;
         if (layer)
@@ -206,15 +207,17 @@ public:
     }
 };
 
-template<typename Tpsys>
-void CalcForceFromPlanet(Tpsys & psys, const FP_t & pla){
+template <typename Tpsys>
+void CalcForceFromPlanet(Tpsys &psys, const FP_t &pla)
+{
     const auto n = psys.getNumberOfParticleLocal();
 #pragma omp parallel for
-    for(auto i=0; i<n; i++){
+    for (auto i = 0; i < n; i++)
+    {
         const auto rij = psys[i].pos_car - pla.pos_car;
-        const auto r_sq = rij*rij;
+        const auto r_sq = rij * rij;
         const auto r_inv = 1.0 / sqrt(r_sq);
-        const auto pot   = pla.mass * r_inv;
+        const auto pot = pla.mass * r_inv;
         psys[i].acc -= pot * r_inv * r_inv * rij;
         psys[i].pot -= pot;
     }
@@ -226,32 +229,32 @@ int main(int argc, char *argv[])
 
     PS::ParticleSystem<FP_t> system;
     system.initialize();
-    PS::S64 n_glb = 1.0e5;  // 粒子数
-    PS::F64 ax_in = 1.0;    // 地球とリングの内側までの距離[REARTH]
-    PS::F64 ax_out = 3.5;     // 地球とリングの外側までの距離[REARTH]
-    PS::F64 ecc_rms = 0.3;  // normalized
-    PS::F64 inc_rms = 0.15; // normalized
-    PS::F64 dens = 1.0e8;   // [g/cm^2]
-    PS::F64 mass_sun = 1.0; //[MEARTH]
+    PS::S64 n_glb = 1.0e4;    // 粒子数
+    PS::F64 ax_in = 1.0;      // 地球とリングの内側までの距離[REARTH]
+    PS::F64 ax_out = 3.0;       // 地球とリングの外側までの距離[REARTH]
+    PS::F64 ecc_rms = 0.3;    // normalized
+    PS::F64 inc_rms = 0.15;   // normalized
+    PS::F64 dens;     // [g/cm^2]
+    PS::F64 mass_earth = 1.0; //[MEARTH]
     double a_ice = 0.0;
     double f_ice = 1.0;
     double power = -3.0;
     PS::S32 seed = 0;
-
-    PS::S64 n_loc = n_glb;
+    PS::F64 e_refl = 0.1;
+    //PS::S64 n_loc = n_glb;
 
     PS::F64 m_ptcl;
 
-    PLANET.mass = mass_sun;
+    PLANET.mass = mass_earth;
     PLANET.pos_car = PLANET.vel = 0.0;
 
-    SetParticleKeplerDisk(system, n_glb, ax_in, ax_out, ecc_rms, inc_rms, dens, mass_sun, a_ice, f_ice, power, seed);
+    SetParticleKeplerDisk(system, n_glb, ax_in, ax_out, ecc_rms, inc_rms, dens, mass_earth, a_ice, f_ice, power, seed);
     m_ptcl = system[0].mass;
     if (PS::Comm::getRank() == 0)
     {
 
         FILE *fp;
-        fp = fopen("./result/temp/snap00000.dat", "w");
+        fp = fopen("./result/planet_coll/snap00000.dat", "w");
 
         DiskInfo disk_info;
         FDPS_UTIL::ComandLineOptionManager cmd(argc, argv);
@@ -283,13 +286,12 @@ int main(int argc, char *argv[])
         cmd.read();
 
         PS::F64 delta_ax = ax_out - ax_in;
-        PS::F64 e_refl = 0.1;
         PS::F64 t_dur = cmd.get("t_dur");
         PS::F64 tau = cmd.get("tau");
         PS::F64 rphy_over_rhill = cmd.get("rphy_over_rhill");
-        disk_info.setParams(delta_ax, e_refl, t_dur, tau, rphy_over_rhill, n_glb, ax_in, ax_out,dens,m_ptcl);
-    
-        CalcForceFromPlanet(system, PLANET);
+        disk_info.setParams(delta_ax, e_refl, t_dur, tau, rphy_over_rhill, n_glb, ax_in, ax_out, dens, m_ptcl);
+
+        //CalcForceFromPlanet(system, PLANET);
 
         Energy eng_now;
         eng_now.calc(system);
@@ -303,7 +305,8 @@ int main(int argc, char *argv[])
 
         disk_info.set_r_coll_search(system, n_glb);
 
-        for (int i = 0; i < n_glb; i++){
+        for (int i = 0; i < n_glb; i++)
+        {
             system[i].writeAscii(fp);
         }
 
@@ -312,6 +315,7 @@ int main(int argc, char *argv[])
         PS::F64 dens_p = m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll), 3.0));
         PS::F64 dens_e = 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0), 3.0));
 
+        std::cout << "particles size = " << REARTH2CM(system[0].r_coll) / 1.0e5 << " [km]" << std::endl;
         std::cout << "R_Roche = " << 2.456 * pow(dens_p / dens_e, -1.0 / 3.0) << " [R_earth]" << std::endl;
         std::cout << "particles density = " << dens_p << " [g/cm^3]" << std::endl;
         std::cout << "earth density = " << dens_e << " [g/cm^3]" << std::endl;

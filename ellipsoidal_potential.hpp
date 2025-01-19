@@ -1,6 +1,10 @@
+#pragma once
+#include <particle_simulator.hpp>
+constexpr PS::F64 PI = MY_LIB::CONSTANT::pi;
+/*
 #include <iostream>
 #include <random>
-#include <particle_simulator.hpp>
+
 std::mt19937 eng(10);
 std::uniform_real_distribution<double> rnd(-1.0, 1.0);
 
@@ -39,8 +43,9 @@ void calc_force(PS::F64vec& acc, PS::F64& pot, const PS::F64vec pos, const Ptcl*
         acc -= ptcl[i].m * r_inv * r_inv * r_inv * dr;
     }
 }
+*/
 
-void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double rho, const double a,
+void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double mass, const double a,
              const double b, const double c) {
     acc = 0.0;
     pot = 0.0;
@@ -50,7 +55,7 @@ void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double 
     const PS::F64 x_sq = x * x;
     const PS::F64 y_sq = y * y;
     const PS::F64 z_sq = z * z;
-    const PS::F64 mass = 4.0 * PI / 3.0 * rho * a * b * c;
+    const PS::F64 rho = 3.0 * mass / (4.0 * PI * a * b * c);
     const PS::F64 r_sq = pos * pos;
     const PS::F64 r_inv = 1.0 / sqrt(r_sq);
     const PS::F64 pot0 = -mass * r_inv;
@@ -73,23 +78,23 @@ void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double 
 }
 
 void calc_force_rot(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const PS::F64vec& vel,
-                    const PS::F64 rho, const PS::F64 a, const PS::F64 b, const PS::F64 c,
+                    const PS::F64 mass, const PS::F64 a, const PS::F64 b, const PS::F64 c,
                     const PS::F64vec& omega) {
     acc = 0.0;
     pot = 0.0;
     PS::F64vec acc_pot = 0.0;
-    calc_mm(acc_pot, pot, pos, rho, a, b, c);
+    calc_mm(acc_pot, pot, pos, mass, a, b, c);
     PS::F64vec acc_cor = -2.0 * (omega ^ vel);
     PS::F64vec acc_cen = -omega ^ (omega ^ pos);
-    // std::cout << "omega ^ pos= " << (omega ^ pos) << std::endl;
-    std::cout<<std::endl;
-    std::cout << "acc_pot= " << acc_pot << std::endl;
-    std::cout << "acc_cor= " << acc_cor << std::endl;
-    std::cout << "acc_cen= " << acc_cen << std::endl;
     acc = acc_pot + acc_cor + acc_cen;
-    std::cout<<"acc= "<<acc<<std::endl;
+    // std::cout<<std::endl;
+    // std::cout << "omega ^ pos= " << (omega ^ pos) << std::endl;
+    // std::cout << "acc_pot= " << acc_pot << std::endl;
+    // std::cout << "acc_cor= " << acc_cor << std::endl;
+    // std::cout << "acc_cen= " << acc_cen << std::endl;
+    // std::cout << "acc= " << acc << std::endl;
 }
-
+/*
 PS::F64vec calc_vel_kep(const PS::F64 mass, const PS::F64vec& pos) {
     const PS::F64 r_sq = pos * pos;
     const PS::F64 r_inv = 1.0 / sqrt(r_sq);
@@ -168,3 +173,4 @@ int main() {
 #endif
     return 0;
 }
+*/

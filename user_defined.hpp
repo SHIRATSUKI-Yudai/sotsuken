@@ -51,6 +51,8 @@ public:
     PS::F64 pot;
     PS::F64 r_coll;
     PS::F64vec acc_dash;
+    PS::F64vec ellip;
+    PS::F64vec omega;
     PS::F64 r_search;
     static PS::F64 kappa;
     static PS::F64 eta;

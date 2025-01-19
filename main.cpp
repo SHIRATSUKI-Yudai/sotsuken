@@ -4,6 +4,7 @@
 #include <random>
 #include <particle_simulator.hpp>
 #include "user_defined.hpp"
+#include "ellipsoidal_potential.hpp"
 #include "./fdps-util/my_lib.hpp"
 #include "./fdps-util/kepler.hpp"
 #include "./fdps-util/init.hpp"
@@ -211,12 +212,19 @@ void CalcForceFromPlanet(Tpsys &psys, const FP_t &pla)
 #pragma omp parallel for
     for (auto i = 0; i < n; i++)
     {
-        const auto rij = psys[i].pos_car - pla.pos_car;
-        const auto r_sq = rij * rij;
-        const auto r_inv = 1.0 / sqrt(r_sq);
-        const auto pot = pla.mass * r_inv;
-        psys[i].acc -= pot * r_inv * r_inv * rij;
-        psys[i].pot -= pot;
+        //circle
+        // const auto rij = psys[i].pos_car - pla.pos_car;
+        // const auto r_sq = rij * rij;
+        // const auto r_inv = 1.0 / sqrt(r_sq);
+        // const auto pot = pla.mass * r_inv;
+        // psys[i].acc -= pot * r_inv * r_inv * rij;
+        // psys[i].pot -= pot;
+
+        //ellipsoid
+        //calc_mm(psys[i].acc,psys[i].pot,psys[i].pos_car,pla.mass,pla.ellip.x,pla.ellip.y,pla.ellip.z);
+
+        //spin
+        calc_force_rot(psys[i].acc,psys[i].pot,psys[i].pos_car,psys[i].vel,pla.mass,pla.ellip.x,pla.ellip.y,pla.ellip.z,pla.omega);
     }
 }
 
@@ -244,7 +252,7 @@ void Drift(Tpsys &psys,
 }
 
 template <typename Tpsys>
-void RemoveParticlFromSys(Tpsys &psys, Energy &eng_remove)
+void RemoveParticleFromSys(Tpsys &psys, Energy &eng_remove, const PS::F64 time)
 {
     PS::S32 n = psys.getNumberOfParticleLocal();
     std::vector<PS::S32> id_remove;
@@ -252,9 +260,25 @@ void RemoveParticlFromSys(Tpsys &psys, Energy &eng_remove)
     PS::F64 kin = 0.0;
     PS::F64 pot_loc = 0.0;
     PS::F64 kin_loc = 0.0;
+
+    // 逆回転行列の計算
+    PS::F64 angle = -PLANET.omega.z * time;
+    PS::F64 cos_angle = std::cos(angle);
+    PS::F64 sin_angle = std::sin(angle);
     for (auto i = 0; i < n; i++)
     {
-        if (psys[i].pos_cyl.y < 0.9)
+        // 粒子の位置を回転
+        PS::F64 x_rot = psys[i].pos_car.x * cos_angle - psys[i].pos_car.y * sin_angle;
+        PS::F64 y_rot = psys[i].pos_car.x * sin_angle + psys[i].pos_car.y * cos_angle;
+
+        //circle
+        //if (psys[i].pos_cyl.y < (PLANET.r_coll))
+        //ellipsoid
+        // if(psys[i].pos_car.x * psys[i].pos_car.x / PLANET.ellip.x / PLANET.ellip.x 
+        // + psys[i].pos_car.y * psys[i].pos_car.y / PLANET.ellip.y / PLANET.ellip.y < 1.0)
+        //spin
+        if (x_rot * x_rot / PLANET.ellip.x / PLANET.ellip.x 
+         + y_rot * y_rot / PLANET.ellip.y / PLANET.ellip.y < 1.0)
         {
             id_remove.push_back(i);
             kin_loc += 0.5 * psys[i].mass * psys[i].vel * psys[i].vel;
@@ -263,7 +287,9 @@ void RemoveParticlFromSys(Tpsys &psys, Energy &eng_remove)
     }
     if (id_remove.size() > 0)
     {
+        PLANET.mass += psys[0].mass * id_remove.size();
         psys.removeParticle(&id_remove[0], id_remove.size());
+        std::cerr << "PLANET.mass= " << PLANET.mass << std::endl;
         // std::cerr<<"rank= "<<PS::Comm::getRank()<<" id_remove.size()= "<<id_remove.size()<<std::endl;
     }
     pot = PS::Comm::getSum(pot_loc);
@@ -477,10 +503,29 @@ int main(int argc, char *argv[])
     const auto n_proc = PS::Comm::getNumberOfProc();
 
     PLANET.mass = 1.0;
+    PLANET.r_coll = 10.0;
     PLANET.pos_car = PLANET.vel = 0.0;
 
+    // 3軸不等楕円体の場合
+    PLANET.ellip.x = 15.0 ;
+    PLANET.ellip.y = 9.0;
+    PLANET.ellip.z = 1000.0 / PLANET.ellip.x / PLANET.ellip.y;
+
+    // 球体の場合
+    //PLANET.ellip = PLANET.r_coll;
+
+    // ロッシュ半径の3倍での公転周期を計算
+    PS::F64 r = 3.0 * 29.0;
+    PS::F64 G = 1.0;
+    PS::F64 M = PLANET.mass;
+    PS::F64 T_orbit = 2 * MY_PI * sqrt(r * r * r / (G * M));
+    // 自転周期を整数比 1:3 に設定
+    PS::F64 T_spin = T_orbit / 3.0;
+    PLANET.omega = 0.0;
+    PLANET.omega.z = 2.0 * MY_PI / T_spin;
+
     MY_LIB::UnitManager unit_man;
-    unit_man.initializeByLMG(REARTH2CM(1.0), MY_LIB::CONSTANT::mass_earth_gram, 1.0);
+    unit_man.initializeByLMG(REARTH2CM(0.1), MY_LIB::CONSTANT::mass_earth_gram, G);
     unit_man.dump(std::cerr);
 
     FDPS_UTIL::ComandLineOptionManager cmd(argc, argv);
@@ -587,6 +632,8 @@ int main(int argc, char *argv[])
     {
         unit_man.dump(fout_log);
         fout_log << "my_rank= " << my_rank << " pos_domain= " << pos_domain << std::endl;
+        fout_log << "PLANET.ellip= ( " << PLANET.ellip << " )" << std::endl;
+        fout_log << "PLANET.omega= ( " << PLANET.omega << " )" << std::endl;
     }
     DiskInfo disk_info;
     SatelliteSystem sat_system_glb;
@@ -810,7 +857,7 @@ int main(int argc, char *argv[])
         Kick(system, 0.5 * param.getDt());
         Drift(system, param.getDt());
         RemoveSatFromSys(system, sat_system_glb);
-        RemoveParticlFromSys(system, eng_remove);
+        RemoveParticleFromSys(system, eng_remove, param.getTimeSys());
 
         param.integrateTime();
         n_loop++;
@@ -898,13 +945,13 @@ int main(int argc, char *argv[])
         auto n_walk = tree.getNumberOfWalkGlobal();
         auto n_int_ep_ep = tree.getNumberOfInteractionEPEPGlobal();
         auto n_int_ep_sp = tree.getNumberOfInteractionEPSPGlobal();
-        if (PS::Comm::getRank() == 0 && n_loop % 100 == 0)
+        if (PS::Comm::getRank() == 0 && n_loop % 10000 == 0)
         {
             eng_init.dump(std::cout);
             eng_now.dump(std::cout);
             std::cout << "eng_now.disp= " << eng_now.disp << std::endl;
             std::cout << "eng_remove.tot=" << eng_remove.tot << std::endl;
-            std::cout << "param.getTimeSys()= " << param.getTimeSys() << " n_loop= " << n_loop << " (eng_now.tot-eng_init.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot) / eng_init.tot
+            std::cout << "param.getTimeSys()= " << param.getTimeSys() << " n_loop= " << n_loop << " (eng_now.tot-eng_init.tot+eng_remove.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot + eng_remove.tot) / eng_init.tot
                       << " (eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot - eng_now.disp + eng_remove.tot) / eng_init.tot
                       //<<" (eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot
                       << std::endl;
@@ -917,9 +964,10 @@ int main(int argc, char *argv[])
 
             eng_init.dump(fout_log);
             eng_now.dump(fout_log);
+            fout_log << "PLANET.mass= " << PLANET.mass << std::endl;
             fout_log << "eng_now.disp= " << eng_now.disp << std::endl;
             fout_log << "eng_remove.tot=" << eng_remove.tot << std::endl;
-            fout_log << "param.getTimeSys()= " << param.getTimeSys() << " n_loop= " << n_loop << " (eng_now.tot-eng_init.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot) / eng_init.tot
+            fout_log << "param.getTimeSys()= " << param.getTimeSys() << " n_loop= " << n_loop << " (eng_now.tot-eng_init.tot+eng_remove.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot + eng_remove.tot) / eng_init.tot
                      << " (eng_now.tot-eng_init.tot-eng_now.disp+eng_remove.tot)/eng_init.tot= " << (eng_now.tot - eng_init.tot - eng_now.disp + eng_remove.tot) / eng_init.tot
                      //<<" (eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot= "<<(eng_now.tot-eng_init.tot+eng_now.disp)/eng_init.tot
                      << std::endl;

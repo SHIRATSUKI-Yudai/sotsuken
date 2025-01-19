@@ -78,7 +78,7 @@ public:
         ax_out_ = ax_out;
         // r_phy_ = sqrt(tau_ * (ax_out_ * ax_out_ - ax_in_ * ax_in_) / n_glb_);
         // r_phy_ = CM2REARTH(pow(m_ptcl * 5.97e27 / (4.0 / 3.0 * MY_PI * 3.3), 1.0 / 3.0));
-        r_phy_ = pow(m_ptcl, 1.0 / 3.0) / 2.456 * 2.9; //[R_EARTH]
+        r_phy_ = pow(m_ptcl, 1.0 / 3.0) / 2.456 * 2.9 * 10.0; //[R_EARTH]
         r_hill_ = r_phy_ / rphy_over_rhill;
         m_ptcl_ = m_ptcl;
         // m_ptcl_ = (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * (r_hill_ / ((ax_out_ + ax_in_) * 0.5)) * 3.0 * PLANET.mass * 0.5;
@@ -230,8 +230,8 @@ int main(int argc, char *argv[])
     PS::ParticleSystem<FP_t> system;
     system.initialize();
     PS::S64 n_glb = 1.0e4;    // 粒子数
-    PS::F64 ax_in = 1.0;      // 地球とリングの内側までの距離[REARTH]
-    PS::F64 ax_out = 3.0;       // 地球とリングの外側までの距離[REARTH]
+    PS::F64 ax_in = 15;      // 地球とリングの内側までの距離[REARTH]
+    PS::F64 ax_out = 40;       // 地球とリングの外側までの距離[REARTH]
     PS::F64 ecc_rms = 0.3;    // normalized
     PS::F64 inc_rms = 0.15;   // normalized
     PS::F64 dens;     // [g/cm^2]
@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
     {
 
         FILE *fp;
-        fp = fopen("./result/planet_coll/snap00000.dat", "w");
+        fp = fopen("./result/spin/snap00000.dat", "w");
 
         DiskInfo disk_info;
         FDPS_UTIL::ComandLineOptionManager cmd(argc, argv);
@@ -312,10 +312,10 @@ int main(int argc, char *argv[])
 
         fclose(fp);
 
-        PS::F64 dens_p = m_ptcl * 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll), 3.0));
-        PS::F64 dens_e = 5.97e27 / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0), 3.0));
+        PS::F64 dens_p = m_ptcl * MY_LIB::CONSTANT::mass_earth_gram / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(system[0].r_coll / 10.0), 3.0));
+        PS::F64 dens_e = MY_LIB::CONSTANT::mass_earth_gram / ((4.0 / 3.0) * MY_PI * pow(REARTH2CM(1.0), 3.0));
 
-        std::cout << "particles size = " << REARTH2CM(system[0].r_coll) / 1.0e5 << " [km]" << std::endl;
+        std::cout << "particles size = " << REARTH2CM(system[0].r_coll / 10.0) * 1e-5 << " [km]" << std::endl;
         std::cout << "R_Roche = " << 2.456 * pow(dens_p / dens_e, -1.0 / 3.0) << " [R_earth]" << std::endl;
         std::cout << "particles density = " << dens_p << " [g/cm^3]" << std::endl;
         std::cout << "earth density = " << dens_e << " [g/cm^3]" << std::endl;

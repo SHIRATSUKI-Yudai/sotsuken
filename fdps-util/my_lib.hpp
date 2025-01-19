@@ -5,6 +5,8 @@ namespace MY_LIB{
 	constexpr long double c_cgs = 2.99792458e10L; //  cm / s
 	constexpr long double pi    = 3.14159265358979323846L;
 	constexpr long double mass_saturn_cgs = 5.688e29L; // g
+	constexpr long double mass_earth_gram = 5.97e27L; // g
+	constexpr long double mass_quaoar_gram = 1.2e24L; // g
 	constexpr long double au_cgs = 1.49597871475e13L; //cm
     };
     namespace LITERAL{

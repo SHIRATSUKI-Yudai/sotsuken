@@ -101,8 +101,9 @@ template <typename Tsys>
 void RigidRotation(Tsys &sys, const PS::F64 dt)
 {
     const auto n = sys.getNumberOfParticleLocal();
-    const auto ax = 1.0;
-    const auto mm = sqrt(PLANET.mass / (ax * ax * ax)); // mean mortion
+    //const auto ax = 1.0;
+    //const auto mm = sqrt(PLANET.mass / (ax * ax * ax)); // mean mortion
+    const auto mm = PLANET.omega.z;
     const auto theta = mm * dt;
     const auto cth = std::cos(theta);
     const auto sth = std::sin(theta);
@@ -224,7 +225,7 @@ void CalcForceFromPlanet(Tpsys &psys, const FP_t &pla)
         //calc_mm(psys[i].acc,psys[i].pot,psys[i].pos_car,pla.mass,pla.ellip.x,pla.ellip.y,pla.ellip.z);
 
         //spin
-        calc_force_rot(psys[i].acc,psys[i].pot,psys[i].pos_car,psys[i].vel,pla.mass,pla.ellip.x,pla.ellip.y,pla.ellip.z,pla.omega);
+        calc_force_rot(psys[i].acc,psys[i].pot,psys[i].pos_car,psys[i].vel,pla.mass,pla.ellip,pla.omega);
     }
 }
 
@@ -252,33 +253,19 @@ void Drift(Tpsys &psys,
 }
 
 template <typename Tpsys>
-void RemoveParticleFromSys(Tpsys &psys, Energy &eng_remove, const PS::F64 time)
+void RemoveParticleFellToEarth(Tpsys &psys, Energy &eng_remove)
 {
-    PS::S32 n = psys.getNumberOfParticleLocal();
+    PS::S32 n_loc = psys.getNumberOfParticleLocal();
     std::vector<PS::S32> id_remove;
-    PS::F64 pot = 0.0;
-    PS::F64 kin = 0.0;
     PS::F64 pot_loc = 0.0;
     PS::F64 kin_loc = 0.0;
+    PS::F64 mass_remove_loc = 0.0;
 
-    // 逆回転行列の計算
-    PS::F64 angle = -PLANET.omega.z * time;
-    PS::F64 cos_angle = std::cos(angle);
-    PS::F64 sin_angle = std::sin(angle);
-    for (auto i = 0; i < n; i++)
+    for (auto i = 0; i < n_loc; i++)
     {
-        // 粒子の位置を回転
-        PS::F64 x_rot = psys[i].pos_car.x * cos_angle - psys[i].pos_car.y * sin_angle;
-        PS::F64 y_rot = psys[i].pos_car.x * sin_angle + psys[i].pos_car.y * cos_angle;
-
-        //circle
-        //if (psys[i].pos_cyl.y < (PLANET.r_coll))
-        //ellipsoid
-        // if(psys[i].pos_car.x * psys[i].pos_car.x / PLANET.ellip.x / PLANET.ellip.x 
-        // + psys[i].pos_car.y * psys[i].pos_car.y / PLANET.ellip.y / PLANET.ellip.y < 1.0)
-        //spin
-        if (x_rot * x_rot / PLANET.ellip.x / PLANET.ellip.x 
-         + y_rot * y_rot / PLANET.ellip.y / PLANET.ellip.y < 1.0)
+        if(psys[i].pos_car.x * psys[i].pos_car.x / PLANET.ellip.x / PLANET.ellip.x +
+           psys[i].pos_car.y * psys[i].pos_car.y / PLANET.ellip.y / PLANET.ellip.y +
+           psys[i].pos_car.z * psys[i].pos_car.z / PLANET.ellip.z / PLANET.ellip.z < 0.8)
         {
             id_remove.push_back(i);
             kin_loc += 0.5 * psys[i].mass * psys[i].vel * psys[i].vel;
@@ -287,14 +274,11 @@ void RemoveParticleFromSys(Tpsys &psys, Energy &eng_remove, const PS::F64 time)
     }
     if (id_remove.size() > 0)
     {
-        PLANET.mass += psys[0].mass * id_remove.size();
+        mass_remove_loc = psys[0].mass * id_remove.size();
         psys.removeParticle(&id_remove[0], id_remove.size());
-        std::cerr << "PLANET.mass= " << PLANET.mass << std::endl;
-        // std::cerr<<"rank= "<<PS::Comm::getRank()<<" id_remove.size()= "<<id_remove.size()<<std::endl;
     }
-    pot = PS::Comm::getSum(pot_loc);
-    kin = PS::Comm::getSum(kin_loc);
-    eng_remove.tot += kin + pot;
+    PLANET.mass += PS::Comm::getSum(mass_remove_loc);
+    eng_remove.tot += PS::Comm::getSum(kin_loc) + PS::Comm::getSum(pot_loc);
 }
 
 template <typename Tpsys>
@@ -502,27 +486,28 @@ int main(int argc, char *argv[])
     const auto my_rank = PS::Comm::getRank();
     const auto n_proc = PS::Comm::getNumberOfProc();
 
+    PS::S64 n_init = 1e4;
+
     PLANET.mass = 1.0;
-    PLANET.r_coll = 10.0;
     PLANET.pos_car = PLANET.vel = 0.0;
 
-    // 3軸不等楕円体の場合
-    PLANET.ellip.x = 15.0 ;
-    PLANET.ellip.y = 9.0;
-    PLANET.ellip.z = 1000.0 / PLANET.ellip.x / PLANET.ellip.y;
+    // 3軸不等楕円体(ハウメア)の場合
+    PS::F64 a = 1.161;
+    PS::F64 b = 0.852;
+    PS::F64 c = 0.513;
+    PS::F64 product = a * b * c;
+    PS::F64 k = std::cbrt(1.0 / product);
+    PLANET.ellip = 10 * k * PS::F64vec(a, b, c);
 
     // 球体の場合
-    //PLANET.ellip = PLANET.r_coll;
+    PLANET.ellip = 10.0;
 
-    // ロッシュ半径の3倍での公転周期を計算
-    PS::F64 r = 3.0 * 29.0;
+    // ロッシュ半径での公転周期と1:1に自転周期を設定
+    PS::F64 r = 29.0;
     PS::F64 G = 1.0;
     PS::F64 M = PLANET.mass;
-    PS::F64 T_orbit = 2 * MY_PI * sqrt(r * r * r / (G * M));
-    // 自転周期を整数比 1:3 に設定
-    PS::F64 T_spin = T_orbit / 3.0;
     PLANET.omega = 0.0;
-    PLANET.omega.z = 2.0 * MY_PI / T_spin;
+    //PLANET.omega.z = sqrt( G * M / (r * r * r));
 
     MY_LIB::UnitManager unit_man;
     unit_man.initializeByLMG(REARTH2CM(0.1), MY_LIB::CONSTANT::mass_earth_gram, G);
@@ -634,6 +619,7 @@ int main(int argc, char *argv[])
         fout_log << "my_rank= " << my_rank << " pos_domain= " << pos_domain << std::endl;
         fout_log << "PLANET.ellip= ( " << PLANET.ellip << " )" << std::endl;
         fout_log << "PLANET.omega= ( " << PLANET.omega << " )" << std::endl;
+        fout_log << "Rotation mode= " << flag_rot << std::endl;
     }
     DiskInfo disk_info;
     SatelliteSystem sat_system_glb;
@@ -648,6 +634,11 @@ int main(int argc, char *argv[])
         snapshot_manager.read<PS::ParticleSystem<FP_t>, DiskInfo, Energy, SatelliteSystem>(read_file_name_base, system, t, disk_info, eng_init, sat_system_glb);
         param.setTimeSys(t);
         eng_disp_glb = eng_init.getDisp();
+        PS::S64 removed_particle = n_init - system.getNumberOfParticleGlobal();
+        if(removed_particle > 0){
+            PLANET.mass += removed_particle * system[0].mass;
+            fout_log << "removed_particle= " << removed_particle << " PLANET.mass= " << PLANET.mass << std::endl;
+        }
     }
     else
     {
@@ -857,7 +848,7 @@ int main(int argc, char *argv[])
         Kick(system, 0.5 * param.getDt());
         Drift(system, param.getDt());
         RemoveSatFromSys(system, sat_system_glb);
-        RemoveParticleFromSys(system, eng_remove, param.getTimeSys());
+        RemoveParticleFellToEarth(system, eng_remove);
 
         param.integrateTime();
         n_loop++;

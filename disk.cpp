@@ -254,7 +254,7 @@ int main(int argc, char *argv[])
     {
 
         FILE *fp;
-        fp = fopen("./result/spin/snap00000.dat", "w");
+        fp = fopen("./result/ellipsoid/snap00000.dat", "w");
 
         DiskInfo disk_info;
         FDPS_UTIL::ComandLineOptionManager cmd(argc, argv);
@@ -291,7 +291,7 @@ int main(int argc, char *argv[])
         PS::F64 rphy_over_rhill = cmd.get("rphy_over_rhill");
         disk_info.setParams(delta_ax, e_refl, t_dur, tau, rphy_over_rhill, n_glb, ax_in, ax_out, dens, m_ptcl);
 
-        //CalcForceFromPlanet(system, PLANET);
+        CalcForceFromPlanet(system, PLANET);
 
         Energy eng_now;
         eng_now.calc(system);
@@ -305,8 +305,16 @@ int main(int argc, char *argv[])
 
         disk_info.set_r_coll_search(system, n_glb);
 
+        // ロッシュ半径での公転周期と1:1に自転周期を設定
+        PS::F64 r = 29.0;
+        PS::F64 G = 1.0;
+        PS::F64 M = PLANET.mass;
+        PLANET.omega = 0.0;
+        //PLANET.omega.z = 3.0 * sqrt( G * M / (r * r * r));
+
         for (int i = 0; i < n_glb; i++)
         {
+            system[i].vel -= PLANET.omega ^ system[i].pos_car;
             system[i].writeAscii(fp);
         }
 

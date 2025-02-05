@@ -45,10 +45,12 @@ void calc_force(PS::F64vec& acc, PS::F64& pot, const PS::F64vec pos, const Ptcl*
 }
 */
 
-void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double mass, const double a,
-             const double b, const double c) {
-    acc = 0.0;
-    pot = 0.0;
+void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const PS::F64 mass, const PS::F64vec ellip) {
+    //acc = 0.0;
+    //pot = 0.0;
+    const PS::F64 a = ellip.x;
+    const PS::F64 b = ellip.y;
+    const PS::F64 c = ellip.z;
     const PS::F64 x = pos.x;
     const PS::F64 y = pos.y;
     const PS::F64 z = pos.z;
@@ -71,22 +73,22 @@ void calc_mm(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const double 
     const PS::F64 qzz = 4.0 * PI * rho / 15.0 * a * b * c * c_z;
     const PS::F64 qrr = qxx * x_sq + qyy * y_sq + qzz * z_sq;
     const PS::F64 pot2 = -0.5 * r5_inv * qrr;
-    pot = pot0 + pot2;
+    pot += pot0 + pot2;
     const PS::F64vec tmp_v(qxx * x, qyy * y, qzz * z);
     const PS::F64vec acc2 = 0.5 * r5_inv * r2_inv * (-5.0 * qrr * pos + 2.0 * r_sq * tmp_v);
     acc = acc0 + acc2;
 }
 
 void calc_force_rot(PS::F64vec& acc, PS::F64& pot, const PS::F64vec& pos, const PS::F64vec& vel,
-                    const PS::F64 mass, const PS::F64 a, const PS::F64 b, const PS::F64 c,
-                    const PS::F64vec& omega) {
-    acc = 0.0;
-    pot = 0.0;
+                    const PS::F64 mass, const PS::F64vec ellip, const PS::F64vec& omega) {
+    //acc = 0.0;
+    //pot = 0.0;
     PS::F64vec acc_pot = 0.0;
-    calc_mm(acc_pot, pot, pos, mass, a, b, c);
+    calc_mm(acc_pot, pot, pos, mass, ellip);
+    //PS::F64vec vel_0 = vel - (omega ^ pos);
     PS::F64vec acc_cor = -2.0 * (omega ^ vel);
     PS::F64vec acc_cen = -omega ^ (omega ^ pos);
-    acc = acc_pot + acc_cor + acc_cen;
+    acc += acc_pot + acc_cor + acc_cen;
     // std::cout<<std::endl;
     // std::cout << "omega ^ pos= " << (omega ^ pos) << std::endl;
     // std::cout << "acc_pot= " << acc_pot << std::endl;
